@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Gooners</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #111; color: #f2f2f2; }
+  header { background: #9c0f1f; padding: 28px 16px; text-align: center; border-bottom: 4px solid #fff; }
+  header h1 { margin: 0 0 6px; font-size: 2.2rem; letter-spacing: 2px; }
+  header p { margin: 0; opacity: 0.9; }
+  main { max-width: 900px; margin: 0 auto; padding: 20px 16px; }
+  section { background: #1c1c1c; border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+  h2 { margin-top: 0; color: #ff4d5e; font-size: 1.3rem; }
+  ul { padding-left: 20px; margin: 0; }
+  li { margin-bottom: 8px; }
+  input, textarea, button { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333; background: #252525; color: #f2f2f2; font-size: 0.95rem; font-family: inherit; margin-bottom: 8px; }
+  button { background: #9c0f1f; border: none; font-weight: 700; cursor: pointer; }
+  button:hover { background: #b81426; }
+  .msg { background: #252525; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; }
+  .msg strong { color: #ff4d5e; }
+  .msg small { color: #888; }
+  .poll-option { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #2a2a2a; }
+  .poll-option button { width: auto; padding: 6px 12px; margin: 0; }
+  .muted { color: #888; font-size: 0.85rem; }
+  footer { text-align: center; color: #666; font-size: 0.8rem; padding: 24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>THE GOONERS</h1>
+  <p>Fans, fixtures, and the chat that never stops.</p>
+</header>
+
+<main>
+
+  <section>
+    <h2>Upcoming fixtures</h2>
+    <p class="muted">Edit the list in the script at the bottom of this file to update dates.</p>
+    <ul id="fixtures"></ul>
+  </section>
+
+  <section>
+    <h2>Fan chat</h2>
+    <input id="name" placeholder="Your name or chant name" maxlength="30">
+    <textarea id="message" rows="3" placeholder="Say something to the lads..." maxlength="280"></textarea>
+    <button id="postBtn">Post</button>
+    <div id="messages"></div>
+  </section>
+
+  <section>
+    <h2>Poll: Player of the month</h2>
+    <p class="muted">Add or change the options in the script below.</p>
+    <div id="poll"></div>
+  </section>
+
+</main>
+
+<footer>Made by fans, for fans. Not affiliated with any club.</footer>
+
+<script>
+  // ---- EDIT THESE ----
+  const fixtures = [
+    { date: "2026-12-05", opponent: "Opponent FC", venue: "Home" },
+    { date: "2026-12-12", opponent: "Another Club", venue: "Away" },
+    { date: "2026-12-19", opponent: "Rivals United", venue: "Home" }
+  ];
+
+  const pollOptions = ["Player A", "Player B", "Player C", "Player D"];
+  // --------------------
+
+  // Fixtures
+  const fixtureList = document.getElementById("fixtures");
+  fixtures.forEach(f => {
+    const li = document.createElement("li");
+    const d = new Date(f.date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+    li.textContent = `${d} - vs ${f.opponent} (${f.venue})`;
+    fixtureList.appendChild(li);
+  });
+
+  // Chat (saved in this browser)
+  const msgBox = document.getElementById("messages");
+  const nameInput = document.getElementById("name");
+  const msgInput = document.getElementById("message");
+  let messages = JSON.parse(localStorage.getItem("gooners-chat") || "[]");
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function renderMessages() {
+    msgBox.innerHTML = messages.slice().reverse().map(m =>
+      `<div class="msg"><strong>${escapeHtml(m.name)}</strong> <small>${new Date(m.time).toLocaleString()}</small><br>${escapeHtml(m.text)}</div>`
+    ).join("") || '<p class="muted">No messages yet. Be the first.</p>';
+  }
+
+  document.getElementById("postBtn").addEventListener("click", () => {
+    const text = msgInput.value.trim();
+    const name = nameInput.value.trim() || "Anonymous Gooner";
+    if (!text) return;
+    messages.push({ name, text, time: Date.now() });
+    messages = messages.slice(-100);
+    localStorage.setItem("gooners-chat", JSON.stringify(messages));
+    msgInput.value = "";
+    renderMessages();
+  });
+
+  renderMessages();
+
+  // Poll (votes saved in this browser)
+  const pollBox = document.getElementById("poll");
+  let votes = JSON.parse(localStorage.getItem("gooners-poll") || "{}");
+  let voted = localStorage.getItem("gooners-voted");
+
+  function renderPoll() {
+    pollBox.innerHTML = pollOptions.map(opt => `
+      <div class="poll-option">
+        <span>${escapeHtml(opt)} <small class="muted">(${votes[opt] || 0} votes)</small></span>
+        <button ${voted ? "disabled" : ""} data-opt="${escapeHtml(opt)}">Vote</button>
+      </div>`).join("") + (voted ? `<p class="muted">You voted for ${escapeHtml(voted)}.</p>` : "");
+    pollBox.querySelectorAll("button[data-opt]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const opt = btn.dataset.opt;
+        votes[opt] = (votes[opt] || 0) + 1;
+        voted = opt;
+        localStorage.setItem("gooners-poll", JSON.stringify(votes));
+        localStorage.setItem("gooners-voted", opt);
+        renderPoll();
+      });
+    });
+  }
+
+  renderPoll();
+</script>
+
+</body>
+</html>
